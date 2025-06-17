@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow Matching Explained: From Noise to Robot Actions - Aditya Sehgal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #ffffff;
+            transition: background-color 0.3s, color 0.3s;
+            padding: 20px 40px 0 40px; /* Added top and side padding */
+        }
+
+        body.dark {
+            background-color: #111827;
+            color: #f9fafb;
+        }
+
+        .container {
+            max-width: calc(1200px - 80px); /* Subtract the body padding (40px * 2) */
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            body {
+                padding: 15px 30px 0 30px;
+            }
+            
+            .container {
+                max-width: calc(100% - 60px);
+                padding: 0 15px;
+            }
+            
+            .main-layout {
+                gap: 30px;
+            }
+            
+            .toc {
+                flex: 0 0 200px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px 20px 0 20px;
+            }
+            
+            .container {
+                max-width: calc(100% - 40px);
+                padding: 0 10px;
+            }
+            
+            .main-layout {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .toc {
+                display: none;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                gap: 15px;
+            }
+            
+            .nav-buttons {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .article-title {
+                font-size: 28px;
+            }
+            
+            .article-subtitle {
+                font-size: 16px;
+            }
+            
+            .content-section h2 {
+                font-size: 24px;
+            }
+            
+            .chart-container {
+                padding: 15px;
+            }
+            
+            #flowChart {
+                width: 100%;
+                height: 300px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px 15px 0 15px;
+            }
+            
+            .container {
+                max-width: calc(100% - 30px);
+                padding: 0 5px;
+            }
+            
+            .logo {
+                font-size: 24px;
+            }
+            
+            .nav-buttons {
+                gap: 10px;
+            }
+            
+            .btn {
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+            
+            .article-title {
+                font-size: 24px;
+                line-height: 1.3;
+            }
+            
+            .article-subtitle {
+                font-size: 14px;
+            }
+            
+            .article-meta {
+                flex-wrap: wrap;
+                gap: 10px;
+                font-size: 12px;
+            }
+            
+            .content-section h2 {
+                font-size: 20px;
+            }
+            
+            .content-section p {
+                font-size: 14px;
+            }
+            
+            .chart-container {
+                padding: 10px;
+            }
+            
+            #flowChart {
+                height: 250px;
+            }
+            
+            .chart-title {
+                font-size: 12px;
+            }
+            
+            .github-card {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .github-preview {
+                flex: none;
+                width: 100%;
+                height: 60px;
+            }
+            
+            .toc {
+                display: none;
+            }
+        }
+
+        /* Header */
+        header {
+            padding: 20px 0;
+            border-bottom: 1px solid #eee;
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 100;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        body.dark header {
+            background: #111827;
+            border-bottom-color: #374151;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #000;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            transform-origin: left center;
+        }
+
+        .logo:hover {
+            transform: scale(1.05);
+            color: #6366f1;
+        }
+
+        body.dark .logo {
+            color: #f9fafb;
+        }
+
+        body.dark .logo:hover {
+            color: #818cf8;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            transform-origin: center;
+        }
+
+        .btn-primary {
+            background: #6366f1;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5856eb;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-secondary {
+            color: #666;
+        }
+
+        .btn-secondary:hover {
+            color: #333;
+            transform: scale(1.05);
+        }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        /* Main Layout */
+        .main-layout {
+            display: flex;
+            gap: 40px;
+            padding: 40px 0;
+            align-items: flex-start;
+        }
+
+        /* Table of Contents */
+        .toc {
+            flex: 0 0 250px;
+            position: sticky;
+            top: 100px;
+            padding-left: 20px;
+            border-left: 1px solid #e5e7eb;
+        }
+
+        body.dark .toc {
+            border-left-color: #374151;
+        }
+
+        .toc h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #000;
+            transition: color 0.3s;
+        }
+
+        body.dark .toc h3 {
+            color: #f9fafb;
+        }
+
+        .toc ul {
+            list-style: none;
+        }
+
+        .toc li {
+            margin-bottom: 6px;
+        }
+
+        .toc a {
+            color: #666;
+            text-decoration: none;
+            font-size: 13px;
+            transition: color 0.2s;
+            display: block;
+            line-height: 1.4;
+        }
+
+        .toc a:hover {
+            color: #6366f1;
+        }
+
+        .toc .section-title {
+            font-weight: 600;
+            color: #000;
+            margin: 16px 0 8px 0;
+            transition: color 0.3s;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        body.dark .toc .section-title {
+            color: #f9fafb;
+        }
+
+        .toc .subsection {
+            margin-left: 16px;
+        }
+
+        .toc .subsection a {
+            font-size: 12px;
+            color: #888;
+        }
+
+        body.dark .toc .subsection a {
+            color: #9ca3af;
+        }
+
+        .toc .subsection a:hover {
+            color: #6366f1;
+        }
+
+        /* Main Content */
+        .content {
+            flex: 1;
+            max-width: 800px;
+        }
+
+        .article-header {
+            margin-bottom: 40px;
+        }
+
+        .article-title {
+            font-size: 32px;
+            font-weight: bold;
+            line-height: 1.2;
+            margin-bottom: 20px;
+            color: #000;
+            transition: color 0.3s;
+        }
+
+        body.dark .article-title {
+            color: #f9fafb;
+        }
+
+        .article-subtitle {
+            font-size: 18px;
+            color: #666;
+            line-height: 1.5;
+            margin-bottom: 30px;
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .author-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #f85931;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        /* Visualization */
+        .visualization {
+            margin: 40px 0;
+            text-align: center;
+        }
+
+        .chart-container {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        body.dark .chart-container {
+            background: #1f2937;
+            border-color: #374151;
+        }
+
+        .chart-title {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 15px;
+            color: #374151;
+            transition: color 0.3s;
+        }
+
+        body.dark .chart-title {
+            color: #d1d5db;
+        }
+
+        .chart {
+            width: 100%;
+            height: 400px;
+            background: #f9fafb;
+            position: relative;
+            border-radius: 4px;
+        }
+
+        /* GitHub Card */
+        .github-card {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin: 30px 0;
+            background: white;
+        }
+
+        .github-preview {
+            flex: 0 0 120px;
+            height: 80px;
+            background: #f3f4f6;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .github-info h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #000;
+        }
+
+        .github-description {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .github-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Content Sections */
+        .content-section {
+            margin: 40px 0;
+        }
+
+        .content-section h2 {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #000;
+            transition: color 0.3s;
+        }
+
+        body.dark .content-section h2 {
+            color: #f9fafb;
+        }
+
+        .content-section p {
+            font-size: 16px;
+            line-height: 1.7;
+            color: #374151;
+            margin-bottom: 16px;
+        }
+
+        /* Canvas for interactive visualization */
+        #flowChart {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+        }
+
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .legend-star {
+            color: #ef4444;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <a href="#" class="logo">Aditya Sehgal</a>
+                <nav class="nav-buttons">
+                    <a href="#" class="btn btn-primary">Blog</a>
+                    <a href="#" class="btn btn-secondary">Contact</a>
+                    <button class="theme-toggle">🌙</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="main-layout">
+            <aside class="toc">
+                <h3>Table of Contents</h3>
+                <ul>
+                    <li class="subsection"><a href="#core-intuition">The Core Intuition</a></li>
+                    <li class="subsection"><a href="#theoretical">Theoretical Foundations of Flow Matching</a></li>
+                    <li class="subsection"><a href="#loss-function">Loss Function Details</a></li>
+                    <li class="subsection"><a href="#probability">Probability Density Path</a></li>
+                    <li class="subsection"><a href="#training">Training Process in Detail</a></li>
+                    <li class="subsection"><a href="#key-works">Key Works and Citations</a></li>
+                    <li class="section-title">Application to Robotics</li>
+                    <li class="subsection"><a href="#advantages">Advantages Over Traditional Approaches</a></li>
+                    <li class="subsection"><a href="#vector-fields">The Role of Vector Fields</a></li>
+                    <li class="section-title">Flow Matching in Robotics: From Theory to Implementation</li>
+                    <li class="subsection"><a href="#core-implementation">Core Implementation Principles</a></li>
+                </ul>
+            </aside>
+
+            <main class="content">
+                <div class="article-header">
+                    <h1 class="article-title">Flow Matching Explained:<br>From Noise to Robot Actions</h1>
+                    <p class="article-subtitle">Learn how flow matching generates continuous data, such as robot actions, by denoising samples drawn from a simple noise distribution. Understand the key concepts, training process, and application in robotics.</p>
+                    
+                    <div class="article-meta">
+                        <div class="author-avatar">A</div>
+                        <span>Aditya Sehgal</span>
+                        <span>•</span>
+                        <span>Nov 8, 2024</span>
+                        <span>•</span>
+                        <span>20 minutes</span>
+                    </div>
+                </div>
+
+                <div class="visualization">
+                    <div class="chart-container">
+                        <div class="chart-title">Flow Matching Evolution (Step 96)</div>
+                        <canvas id="flowChart" width="700" height="400"></canvas>
+                        <div class="legend">
+                            <div class="legend-item">
+                                <span class="legend-star">★</span>
+                                <span>Targets</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background: #3b82f6;"></div>
+                                <span>Points</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="github-card">
+                    <div class="github-preview">
+                        <div style="position: absolute; top: 10px; left: 10px; right: 10px;">
+                            <div style="height: 15px; background: #ef4444; border-radius: 2px; margin-bottom: 5px;"></div>
+                            <div style="height: 15px; background: #3b82f6; border-radius: 2px; margin-bottom: 5px;"></div>
+                            <div style="height: 15px; background: #f59e0b; border-radius: 2px;"></div>
+                        </div>
+                    </div>
+                    <div class="github-info">
+                        <h3>GitHub - FedeAI/flow-matching</h3>
+                        <p class="github-description">Unlock smooth and continuous data generation for robotics with Flow...</p>
+                        <div class="github-meta">
+                            <span>🔗 GitHub</span>
+                            <span>•</span>
+                            <span>FedeAI</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <p>Flow Matching is a cutting-edge framework in generative modeling that has pushed the boundaries in fields like image and speech generation, and now, robotics. By learning smooth transformations—flows—from simple noise distributions to complex target distributions, Flow Matching enables the creation of continuous data in a way that's both efficient and scalable.</p>
+                </div>
+
+                <div class="content-section" id="core-intuition">
+                    <h2>The Core Intuition</h2>
+                    <p>At its heart, Flow Matching involves training a neural network to model a velocity field that defines how data points transition over time. Imagine starting with random noise and, through a continuous process, gradually shaping it into precise robot joint movements. This approach is fundamentally different from traditional methods that directly predict actions, which can lead to jerky or unrealistic</p>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Canvas visualization
+        const canvas = document.getElementById('flowChart');
+        const ctx = canvas.getContext('2d');
+        
+        // Make canvas responsive
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const containerWidth = container.clientWidth - 40; // Account for padding
+            
+            // Set canvas size based on screen width
+            if (window.innerWidth <= 480) {
+                canvas.width = Math.min(containerWidth, 600);
+                canvas.height = 250;
+            } else if (window.innerWidth <= 768) {
+                canvas.width = Math.min(containerWidth, 650);
+                canvas.height = 300;
+            } else {
+                canvas.width = Math.min(containerWidth, 700);
+                canvas.height = 400;
+            }
+            
+            // Redraw after resize
+            drawVisualization();
+        }
+        
+        // Set up canvas
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        function drawVisualization() {
+            const currentWidth = canvas.width;
+            const currentHeight = canvas.height;
+            const currentCenterX = currentWidth / 2;
+            const currentCenterY = currentHeight / 2;
+        
+            // Clear canvas
+            ctx.fillStyle = document.body.classList.contains('dark') ? '#1f2937' : '#f9fafb';
+            ctx.fillRect(0, 0, currentWidth, currentHeight);
+            
+            // Draw grid
+            ctx.strokeStyle = document.body.classList.contains('dark') ? '#374151' : '#e5e7eb';
+            ctx.lineWidth = 1;
+            
+            const gridSpacing = Math.max(30, Math.min(50, currentWidth / 14));
+            
+            // Vertical lines
+            for (let x = 0; x <= currentWidth; x += gridSpacing) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, currentHeight);
+                ctx.stroke();
+            }
+            
+            // Horizontal lines
+            for (let y = 0; y <= currentHeight; y += gridSpacing) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(currentWidth, y);
+                ctx.stroke();
+            }
+            
+            // Draw coordinate axes
+            ctx.strokeStyle = document.body.classList.contains('dark') ? '#6b7280' : '#9ca3af';
+            ctx.lineWidth = 2;
+            
+            // X-axis
+            ctx.beginPath();
+            ctx.moveTo(0, currentCenterY);
+            ctx.lineTo(currentWidth, currentCenterY);
+            ctx.stroke();
+            
+            // Y-axis
+            ctx.beginPath();
+            ctx.moveTo(currentCenterX, 0);
+            ctx.lineTo(currentCenterX, currentHeight);
+            ctx.stroke();
+            
+            // Scale factors for responsive design
+            const scaleX = currentWidth / 700;
+            const scaleY = currentHeight / 400;
+            const scale = Math.min(scaleX, scaleY);
+            
+            // Generate blue points in figure-8 pattern
+            const figureScale = 60 * scale;
+            const leftCenter = {x: currentCenterX - 100 * scaleX, y: currentCenterY};
+            const rightCenter = {x: currentCenterX + 100 * scaleX, y: currentCenterY};
+            
+            const leftPoints = createFigure8Points(150, figureScale, leftCenter.x, leftCenter.y);
+            const rightPoints = createFigure8Points(150, figureScale, rightCenter.x, rightCenter.y);
+            
+            const noisyLeftPoints = addNoise(leftPoints, 20 * scale);
+            const noisyRightPoints = addNoise(rightPoints, 20 * scale);
+            
+            // Draw blue points
+            ctx.fillStyle = '#3b82f6';
+            [...noisyLeftPoints, ...noisyRightPoints].forEach(point => {
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 2 * scale, 0, 2 * Math.PI);
+                ctx.fill();
+            });
+            
+            // Add some scattered blue points
+            for (let i = 0; i < Math.floor(50 * scale); i++) {
+                ctx.beginPath();
+                ctx.arc(
+                    Math.random() * currentWidth,
+                    Math.random() * currentHeight,
+                    1.5 * scale,
+                    0,
+                    2 * Math.PI
+                );
+                ctx.fill();
+            }
+            
+            // Place red stars at strategic positions
+            const starPositions = [
+                {x: leftCenter.x, y: leftCenter.y - figureScale},
+                {x: leftCenter.x - figureScale * 0.7, y: leftCenter.y},
+                {x: leftCenter.x, y: leftCenter.y + figureScale},
+                {x: leftCenter.x + figureScale * 0.7, y: leftCenter.y},
+                {x: rightCenter.x, y: rightCenter.y - figureScale},
+                {x: rightCenter.x - figureScale * 0.7, y: rightCenter.y},
+                {x: rightCenter.x, y: rightCenter.y + figureScale},
+                {x: rightCenter.x + figureScale * 0.7, y: rightCenter.y},
+                // Additional scattered stars (scaled)
+                {x: currentCenterX - 200 * scaleX, y: currentCenterY - 50 * scaleY},
+                {x: currentCenterX - 180 * scaleX, y: currentCenterY + 80 * scaleY},
+                {x: currentCenterX + 180 * scaleX, y: currentCenterY - 80 * scaleY},
+                {x: currentCenterX + 200 * scaleX, y: currentCenterY + 60 * scaleY},
+                {x: currentCenterX, y: currentCenterY - 120 * scaleY},
+                {x: currentCenterX - 50 * scaleX, y: currentCenterY + 120 * scaleY}
+            ];
+            
+            starPositions.forEach(pos => {
+                if (pos.x >= 0 && pos.x <= currentWidth && pos.y >= 0 && pos.y <= currentHeight) {
+                    drawStar(pos.x, pos.y, 6 * scale);
+                }
+            });
+            
+            // Add vector field arrows (responsive)
+            ctx.strokeStyle = document.body.classList.contains('dark') ? '#6b7280' : '#9ca3af';
+            ctx.lineWidth = 1;
+            ctx.fillStyle = document.body.classList.contains('dark') ? '#6b7280' : '#9ca3af';
+            
+            const arrowSpacing = Math.max(40, 80 * scale);
+            
+            for (let x = arrowSpacing; x < currentWidth - arrowSpacing; x += arrowSpacing) {
+                for (let y = arrowSpacing; y < currentHeight - arrowSpacing; y += arrowSpacing) {
+                    let targetX, targetY;
+                    if (x < currentCenterX) {
+                        targetX = leftCenter.x;
+                        targetY = leftCenter.y;
+                    } else {
+                        targetX = rightCenter.x;
+                        targetY = rightCenter.y;
+                    }
+                    
+                    const dx = targetX - x;
+                    const dy = targetY - y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist > 20 * scale) {
+                        const arrowLength = 15 * scale;
+                        const dirX = (dx / dist) * arrowLength;
+                        const dirY = (dy / dist) * arrowLength;
+                        
+                        // Draw arrow
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(x + dirX, y + dirY);
+                        ctx.stroke();
+                        
+                        // Arrow head
+                        const headLength = 4 * scale;
+                        const headAngle = Math.PI / 6;
+                        const angle = Math.atan2(dirY, dirX);
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(x + dirX, y + dirY);
+                        ctx.lineTo(
+                            x + dirX - headLength * Math.cos(angle - headAngle),
+                            y + dirY - headLength * Math.sin(angle - headAngle)
+                        );
+                        ctx.moveTo(x + dirX, y + dirY);
+                        ctx.lineTo(
+                            x + dirX - headLength * Math.cos(angle + headAngle),
+                            y + dirY - headLength * Math.sin(angle + headAngle)
+                        );
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        // Function to create figure-8 pattern points
+        function createFigure8Points(numPoints, scale, offsetX, offsetY) {
+            const points = [];
+            for (let i = 0; i < numPoints; i++) {
+                const t = (i / numPoints) * 4 * Math.PI;
+                const x = scale * Math.sin(t) + offsetX;
+                const y = scale * Math.sin(t) * Math.cos(t) + offsetY;
+                points.push({x, y});
+            }
+            return points;
+        }
+
+        // Add some noise to make it look more realistic
+        function addNoise(points, noiseLevel) {
+            return points.map(p => ({
+                x: p.x + (Math.random() - 0.5) * noiseLevel,
+                y: p.y + (Math.random() - 0.5) * noiseLevel
+            }));
+        }
+
+        // Draw red star targets
+        function drawStar(x, y, size) {
+            ctx.fillStyle = '#ef4444';
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            
+            const spikes = 5;
+            const outerRadius = size;
+            const innerRadius = size * 0.4;
+            
+            for (let i = 0; i < spikes * 2; i++) {
+                const angle = (i * Math.PI) / spikes;
+                const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                const pointX = x + Math.cos(angle) * radius;
+                const pointY = y + Math.sin(angle) * radius;
+                
+                if (i === 0) {
+                    ctx.moveTo(pointX, pointY);
+                } else {
+                    ctx.lineTo(pointX, pointY);
+                }
+            }
+            
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Initial draw
+        drawVisualization();
+        
+        // Theme toggle functionality
+        document.querySelector('.theme-toggle').addEventListener('click', function() {
+            document.body.classList.toggle('dark');
+            const isDark = document.body.classList.contains('dark');
+            this.textContent = isDark ? '☀️' : '🌙';
+            
+            // Redraw canvas with new theme
+            drawVisualization();
+        });
+        
+        // Smooth scrolling for TOC links
+        document.querySelectorAll('.toc a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href').substring(1);
+                const targetElement = document.getElementById(targetId);
+                if (targetElement) {
+                    targetElement.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
